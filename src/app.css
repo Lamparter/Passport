@@ -1,0 +1,97 @@
+@font-face {
+	font-family: 'Phantom Sans';
+	src: url('https://assets.hackclub.com/fonts/Phantom_Sans_0.7/Regular.woff2') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'Phantom Sans';
+	src: url('https://assets.hackclub.com/fonts/Phantom_Sans_0.7/Italic.woff2') format('woff2');
+	font-weight: 400;
+	font-style: italic;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'Phantom Sans';
+	src: url('https://assets.hackclub.com/fonts/Phantom_Sans_0.7/Bold.woff2') format('woff2');
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	--red: #ec3750;
+	--red-deep: #c41f3b;
+	--dark: #17171d;
+	--darker: #0e0e13;
+	--paper: #f6efe0;
+	--ink: #1f2d3d;
+	--muted: #8492a6;
+	--gold: #f1d98f;
+	--foil: linear-gradient(120deg, #f8e7ab 0%, #c79f45 28%, #fbefc4 50%, #b88a2e 74%, #f3dc98 100%);
+	--mono: 'OCR B', 'OCR-B', 'Lucida Console', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+	font-family: 'Phantom Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	color-scheme: dark;
+}
+
+/* One colour + one shape per outcome, so it reads from across a room. */
+[data-state='verified'] {
+	--state: #12a05c;
+	--state-deep: #0a7a44;
+	--state-ink: #ffffff;
+}
+[data-state='adult'] {
+	--state: #f59b0b;
+	--state-deep: #c86f00;
+	--state-ink: #1b1200;
+}
+[data-state='rejected'] {
+	--state: #d90f2f;
+	--state-deep: #8f0019;
+	--state-ink: #ffffff;
+}
+[data-state='expired'] {
+	--state: #4b5563;
+	--state-deep: #1f2937;
+	--state-ink: #ffffff;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	min-height: 100%;
+	background: var(--darker);
+	color: #fff;
+	-webkit-font-smoothing: antialiased;
+	-webkit-text-size-adjust: 100%;
+}
+
+a {
+	color: inherit;
+}
+
+/* Tintable line art: the PNG is only a mask, the colour comes from `color`/`background`. */
+.art {
+	display: block;
+	background: currentColor;
+	-webkit-mask: var(--src) center / contain no-repeat;
+	mask: var(--src) center / contain no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-delay: 0ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
