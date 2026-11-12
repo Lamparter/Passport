@@ -8,5 +8,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('cache-control', 'no-store');
 	response.headers.set('x-frame-options', 'DENY');
 	response.headers.set('referrer-policy', 'no-referrer');
+	response.headers.set('content-language', 'en');
 	return response;
 };

@@ -7,7 +7,7 @@ export const GET: RequestHandler = ({ url, cookies }) => {
 	if (!isConfigured()) redirect(303, '/?error=config');
 	const state = crypto.randomUUID();
 	cookies.set('oauth_state', state, {
-		path: '/auth',
+		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
 		secure: !dev,

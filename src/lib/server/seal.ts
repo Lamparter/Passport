@@ -44,3 +44,49 @@ export async function unseal<T>(token: string, audience: string): Promise<Unseal
 		return { ok: false, reason: code === 'ERR_JWT_EXPIRED' ? 'expired' : 'invalid' };
 	}
 }
+
+// ── Compact tokens ──────────────────────────────────────────────────────────
+// A JWE is ~450 characters, which makes for a dense, hard-to-scan QR code. Staff-scan
+// links use a bare AES-GCM envelope instead: base64url(iv | ciphertext+tag) of [exp, data].
+
+const b64url = (bytes: Uint8Array) =>
+	btoa(String.fromCharCode(...bytes))
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/, '');
+
+const fromB64url = (s: string) =>
+	Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+
+const aesKey = async () =>
+	crypto.subtle.importKey('raw', (await getKey()) as BufferSource, 'AES-GCM', false, ['encrypt', 'decrypt']);
+
+export async function sealCompact(data: unknown, purpose: string, ttlSeconds: number): Promise<string> {
+	const iv = crypto.getRandomValues(new Uint8Array(12));
+	const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+	const cipher = await crypto.subtle.encrypt(
+		{ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(purpose) },
+		await aesKey(),
+		new TextEncoder().encode(JSON.stringify([exp, data]))
+	);
+	const out = new Uint8Array(12 + cipher.byteLength);
+	out.set(iv);
+	out.set(new Uint8Array(cipher), 12);
+	return b64url(out);
+}
+
+export async function unsealCompact<T>(token: string, purpose: string): Promise<Unsealed<T>> {
+	try {
+		const raw = fromB64url(token);
+		const plain = await crypto.subtle.decrypt(
+			{ name: 'AES-GCM', iv: raw.slice(0, 12), additionalData: new TextEncoder().encode(purpose) },
+			await aesKey(),
+			raw.slice(12)
+		);
+		const [exp, payload] = JSON.parse(new TextDecoder().decode(plain)) as [number, T];
+		if (exp < Date.now() / 1000 - 5) return { ok: false, reason: 'expired' };
+		return { ok: true, payload, iat: 0, exp };
+	} catch {
+		return { ok: false, reason: 'invalid' };
+	}
+}

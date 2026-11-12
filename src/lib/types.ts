@@ -27,6 +27,12 @@ export interface Passport {
 	issuedAt: number;
 }
 
+/** The subset of a passport that is encoded into a staff-scan QR code. */
+export type ScanInfo = Pick<
+	Passport,
+	'state' | 'givenNames' | 'surname' | 'number' | 'slackId' | 'age' | 'issuedAt'
+>;
+
 export const STATE_LABEL: Record<PassportState, string> = {
 	verified: 'Verified',
 	adult: 'Verified 18+',
@@ -45,6 +51,19 @@ export const ACCEPTED_ID = {
 	],
 	digital: ['Yoti', 'MyRAFAC app', 'Post Office digital ID']
 };
+
+/** The same list, short enough to print on the passport itself. */
+export const ACCEPTED_BRIEF = [
+	'Government ID',
+	'Postcard ID',
+	'RAF ID card',
+	'Oyster Zip card',
+	'16+ railcard',
+	'School ID',
+	'Yoti',
+	'MyRAFAC app',
+	'Post Office digital ID'
+];
 
 export function avatarUrl(slackId: string | null): string | null {
 	// Hack Club Auth has no picture claim; its docs point to Cachet for Slack avatars.

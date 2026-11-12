@@ -1,3 +1,11 @@
+@import '@fontsource/b612-mono/latin-400.css';
+@import '@fontsource/b612-mono/latin-700.css';
+@import '@fontsource/libre-caslon-text/latin-400.css';
+@import '@fontsource/libre-caslon-text/latin-400-italic.css';
+@import '@fontsource/libre-caslon-text/latin-700.css';
+
+/* Zarathustra is Hack Club's display serif (from hackclub.com); Libre Caslon Text carries the
+   small print; B612 Mono stands in for OCR-B. Phantom Sans is only used off the passport. */
 @font-face {
 	font-family: 'Phantom Sans';
 	src: url('https://assets.hackclub.com/fonts/Phantom_Sans_0.7/Regular.woff2') format('woff2');
@@ -19,42 +27,84 @@
 	font-style: normal;
 	font-display: swap;
 }
+@font-face {
+	font-family: 'Zarathustra';
+	src: url('/fonts/zarathustra.ttf') format('truetype');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
 
 :root {
+	/* Hack Club brand palette */
 	--red: #ec3750;
-	--red-deep: #c41f3b;
-	--dark: #17171d;
-	--darker: #0e0e13;
-	--paper: #f6efe0;
+	--orange: #ff8c37;
+	--yellow: #f1c40f;
+	--cyan: #5bc0de;
+	--blue: #338eda;
+	--darker: #121217;
 	--ink: #1f2d3d;
+	--slate: #3c4858;
 	--muted: #8492a6;
-	--gold: #f1d98f;
-	--foil: linear-gradient(120deg, #f8e7ab 0%, #c79f45 28%, #fbefc4 50%, #b88a2e 74%, #f3dc98 100%);
-	--mono: 'OCR B', 'OCR-B', 'Lucida Console', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-	font-family: 'Phantom Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	color-scheme: dark;
+	--snow: #f9fafc;
+
+	--paper: #f4f1ea;
+	/* Jacket: Hack Club red taken down to a passport burgundy, so the gold foil reads cleanly. */
+	--jacket: #74162a;
+	--jacket-deep: #560d1c;
+	--print: #7a1b2e;
+	--label: #4a5361;
+	--gold: #f0d182;
+	--foil: linear-gradient(
+		112deg,
+		#b07c1e 0%,
+		#f3d583 14%,
+		#fff4c8 26%,
+		#dcae45 40%,
+		#a8731a 54%,
+		#efcc70 70%,
+		#fff2bd 84%,
+		#b98524 100%
+	);
+
+	--sans: 'Phantom Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--serif: 'Zarathustra', 'Libre Caslon Text', 'Iowan Old Style', Palatino, Georgia, serif;
+	--text: 'Libre Caslon Text', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+	--mono: 'B612 Mono', 'OCR B', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+	font-family: var(--text);
+	color-scheme: light;
 }
 
-/* One colour + one shape per outcome, so it reads from across a room. */
+/* One colour + one shape per outcome, so it reads from across a room.
+   --state is the label on the page, --stage the screen behind the passport. */
 [data-state='verified'] {
-	--state: #12a05c;
-	--state-deep: #0a7a44;
+	--state: #0f9d58;
+	--state-deep: #0a7a43;
 	--state-ink: #ffffff;
+	--stage: #0b7a44;
+	--stage-deep: #053d22;
 }
 [data-state='adult'] {
-	--state: #f59b0b;
-	--state-deep: #c86f00;
-	--state-ink: #1b1200;
+	--state: #f7a30a;
+	--state-deep: #e08600;
+	--state-ink: #1d1300;
+	--stage: #e58e00;
+	--stage-deep: #a65800;
 }
 [data-state='rejected'] {
-	--state: #d90f2f;
-	--state-deep: #8f0019;
+	--state: #e01434;
+	--state-deep: #b3001f;
 	--state-ink: #ffffff;
+	--stage: #b10c27;
+	--stage-deep: #5c0012;
 }
 [data-state='expired'] {
 	--state: #4b5563;
 	--state-deep: #1f2937;
 	--state-ink: #ffffff;
+	--stage: #4b5563;
+	--stage-deep: #1f2937;
 }
 
 *,
@@ -67,8 +117,8 @@ html,
 body {
 	margin: 0;
 	min-height: 100%;
-	background: var(--darker);
-	color: #fff;
+	background: #e9ecf1;
+	color: var(--ink);
 	-webkit-font-smoothing: antialiased;
 	-webkit-text-size-adjust: 100%;
 }

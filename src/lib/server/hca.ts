@@ -34,7 +34,10 @@ export async function exchangeCode(url: URL, code: string): Promise<string> {
 			code
 		})
 	});
-	if (!res.ok) throw new Error(`token exchange failed (${res.status})`);
+	if (!res.ok) {
+		const detail = await res.text().catch(() => '');
+		throw new Error(`token exchange failed (${res.status}) ${detail.slice(0, 300)}`);
+	}
 	const body = (await res.json()) as { access_token?: string };
 	if (!body.access_token) throw new Error('token exchange returned no access token');
 	return body.access_token;
@@ -53,13 +56,36 @@ export interface HcaIdentity {
 }
 
 export async function fetchIdentity(accessToken: string): Promise<HcaIdentity> {
-	const res = await fetch(`${HCA}/api/v1/me`, {
-		headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' }
-	});
-	if (!res.ok) throw new Error(`identity lookup failed (${res.status})`);
-	const body = (await res.json()) as { identity?: HcaIdentity };
-	if (!body.identity?.id) throw new Error('identity lookup returned no identity');
-	return body.identity;
+	const headers = { authorization: `Bearer ${accessToken}`, accept: 'application/json' };
+
+	const me = await fetch(`${HCA}/api/v1/me`, { headers });
+	if (me.ok) {
+		const body = (await me.json()) as { identity?: HcaIdentity };
+		if (body.identity?.id) return body.identity;
+	}
+
+	// Fall back to the standard OIDC userinfo endpoint, which uses claim names instead.
+	const info = await fetch(`${HCA}/oauth/userinfo`, { headers });
+	if (!info.ok) {
+		throw new Error(
+			`identity lookup failed (/api/v1/me ${me.status}, /oauth/userinfo ${info.status})`
+		);
+	}
+	const claims = (await info.json()) as Record<string, unknown>;
+	const str = (k: string) => (typeof claims[k] === 'string' ? (claims[k] as string) : null);
+	const sub = str('sub');
+	if (!sub) throw new Error('identity lookup returned no identity');
+	const address = claims.address as { country?: string } | undefined;
+	return {
+		id: sub,
+		first_name: str('given_name') ?? str('name')?.split(' ')[0] ?? null,
+		last_name: str('family_name') ?? str('name')?.split(' ').slice(1).join(' ') ?? null,
+		slack_id: str('slack_id'),
+		verification_status: str('verification_status'),
+		ysws_eligible: claims.ysws_eligible === true,
+		birthday: str('birthdate'),
+		addresses: address?.country ? [{ country: address.country, primary: true }] : null
+	};
 }
 
 export function ageOn(dob: string, now: Date): number | null {

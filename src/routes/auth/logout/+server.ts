@@ -4,5 +4,6 @@ import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = ({ cookies }) => {
 	clearSession(cookies);
-	redirect(303, '/');
+	// ?out stops the home page from sending them straight back into sign-in.
+	redirect(303, '/?out');
 };

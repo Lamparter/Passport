@@ -1,10 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { rosette, waves } from './guilloche';
 	import { mrz } from './mrz';
 	import StateIcon from './StateIcon.svelte';
-	import { avatarUrl, type Passport } from './types';
+	import { ACCEPTED_BRIEF, avatarUrl, type Passport } from './types';
 
-	let { passport }: { passport: Passport | null } = $props();
+	let {
+		passport,
+		entering = false
+	}: {
+		passport: Passport | null;
+		/** Play the slow first-visit opening that leads into Hack Club sign-in. */
+		entering?: boolean;
+	} = $props();
+
+	// Security line work: fine, pale and tileable, as on a real data page.
+	const art = [
+		`--waves-rose: ${waves('#b5475c', { sets: [[2, 20, 10], [3, 9, 6]], stroke: 0.4 })}`,
+		`--waves-slate: ${waves('#56749c', { sets: [[1, 24, 8], [4, 7, 6]], stroke: 0.4 })}`,
+		`--waves-white: ${waves('#ffffff', { sets: [[2, 20, 10], [3, 9, 6]], stroke: 0.6 })}`,
+		`--rosette: ${rosette('#b5475c', { petals: 12, rings: 12 })}`,
+		`--rosette-slate: ${rosette('#56749c', { petals: 16, rings: 10, inner: 0.5, depth: 0.2 })}`
+	].join(';');
 
 	const lines = $derived(passport ? mrz(passport) : null);
 	const avatar = $derived(passport ? avatarUrl(passport.slackId) : null);
@@ -19,23 +36,19 @@
 			.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
 			.toUpperCase();
 
-	const ageText = $derived.by(() => {
-		if (!passport) return '';
-		if (passport.dob) return `${fmtDate(passport.dob)} (${passport.age})`;
-		if (passport.state === 'verified') return '13–18 · VERIFIED';
-		if (passport.state === 'adult') return 'OVER 18 · VERIFIED';
-		return 'NOT VERIFIED';
-	});
-
-	const headline = $derived(
-		passport?.state === 'rejected' ? 'NOT VERIFIED' : passport ? 'VERIFIED' : ''
+	const ageBand = $derived(
+		passport?.state === 'verified' ? '13–18' : passport?.state === 'adult' ? '18+' : 'UNVERIFIED'
 	);
+	const headline = $derived(passport?.state === 'rejected' ? 'Not verified' : 'Verified');
 	const subline = $derived(
 		passport?.state === 'verified'
-			? 'Hack Clubber · age 13–18'
+			? 'Hack Clubber · aged 13–18'
 			: passport?.state === 'adult'
 				? 'Over 18 · see event staff'
 				: 'Present another form of ID'
+	);
+	const microWord = $derived(
+		passport?.state === 'verified' ? 'VERIFIED' : passport?.state === 'adult' ? 'ADULT' : 'REFUSED'
 	);
 
 	async function refreshQr() {
@@ -64,28 +77,30 @@
 	});
 </script>
 
-<div class="scene" class:signed-in={passport} data-state={passport?.state}>
+<div
+	class="scene"
+	class:signed-in={passport}
+	class:entering
+	data-state={passport?.state}
+	style={art}
+>
 	<div class="book">
-		<!-- Data page (bottom half of the open passport) -->
+		<!-- ═════ Data page (lower half of the open passport) ═════ -->
 		<div class="page data">
-			<div class="guilloche"></div>
-			<i class="art wm skyline" style="--src: url(/art/skyline.png)"></i>
-			<i class="art wm dino" style="--src: url(/art/dino-wave.png)"></i>
-			<i class="art wm bridge" style="--src: url(/art/tower-bridge.png)"></i>
+			<div class="print"></div>
 
 			{#if passport && lines}
-				<header>
-					<div class="issuer">
-						<b>HACK CLUB</b>
-						<span>PASSPORT · PASSEPORT · PASAPORTE</span>
-					</div>
-					<dl class="doc">
-						<div><dt>Type</dt><dd>P</dd></div>
-						<div><dt>Code</dt><dd>HCB</dd></div>
-						<div><dt>Passport No.</dt><dd class="num">{passport.number}</dd></div>
-					</dl>
-				</header>
+				<div class="doctype"><b>Passport</b><b>Passeport</b></div>
+				<h2 class="country">Hack Club</h2>
+				<i class="epass"></i>
 
+				<dl class="meta">
+					<div><dt>Type/<i>Type</i></dt><dd>P</dd></div>
+					<div><dt>Code/<i>Code</i></dt><dd>HCA</dd></div>
+					<div><dt>Passport No./<i>N° de passeport</i></dt><dd>{passport.number}</dd></div>
+				</dl>
+
+				<!-- Square, so a Slack avatar is shown whole; monochrome like a laser-engraved portrait -->
 				<div class="photo">
 					<i
 						class="art"
@@ -100,50 +115,45 @@
 							onerror={() => (photoFailed = true)}
 						/>
 					{/if}
-					<span class="kinegram"><i class="art" style="--src: url(/art/dino-8bit.png)"></i></span>
 				</div>
 
 				<dl class="fields">
-					<div class="wide">
-						<dt>Surname <i>/ Nom</i></dt>
-						<dd>{passport.surname}</dd>
+					<div class="row">
+						<div><dt>Surname/<i>Nom</i> (1)</dt><dd>{passport.surname}</dd></div>
 					</div>
-					<div class="wide">
-						<dt>Given names <i>/ Prénoms</i></dt>
-						<dd>{passport.givenNames}</dd>
+					<div class="row">
+						<div><dt>Given names/<i>Prénoms</i> (2)</dt><dd>{passport.givenNames}</dd></div>
 					</div>
-					<div>
+					<div class="row">
+						<div><dt>Nationality/<i>Nationalité</i> (3)</dt><dd>Hack Clubber</dd></div>
+						<div><dt>Age/<i>Âge</i> (4)</dt><dd>{passport.age ?? ageBand}</dd></div>
+					</div>
+					<div class="row">
+						{#if passport.dob}
+							<div>
+								<dt>Date of birth/<i>Date de naissance</i> (5)</dt>
+								<dd>{fmtDate(passport.dob)}</dd>
+							</div>
+						{/if}
 						{#if passport.country}
-							<dt>Country <i>/ Pays</i></dt>
-							<dd>{passport.country.name}</dd>
+							<div><dt>Country/<i>Pays</i> (6)</dt><dd>{passport.country.name}</dd></div>
 						{:else}
-							<dt>Nationality <i>/ Nationalité</i></dt>
-							<dd>Hack Clubber</dd>
+							<div><dt>Slack ID/<i>ID Slack</i> (6)</dt><dd>{passport.slackId ?? '—'}</dd></div>
 						{/if}
 					</div>
-					<div>
-						<dt>{passport.dob ? 'Date of birth' : 'Age'} <i>/ {passport.dob ? 'Né(e) le' : 'Âge'}</i></dt>
-						<dd>{ageText}</dd>
-					</div>
-					<div>
-						<dt>Date of check <i>/ Vérifié le</i></dt>
-						<dd>{fmtDate(passport.issuedAt)}</dd>
-					</div>
-					<div>
-						<dt>Slack ID</dt>
-						<dd>{passport.slackId ?? '—'}</dd>
-					</div>
-					<div class="wide">
-						<dt>Authority <i>/ Autorité</i></dt>
-						<dd>Hack Club Identity Vault</dd>
+					<div class="row">
+						<div>
+							<dt>Date of issue/<i>Date de délivrance</i> (7)</dt>
+							<dd>{fmtDate(passport.issuedAt)}</dd>
+						</div>
+						<div><dt>Authority/<i>Autorité</i> (8)</dt><dd>HC IDV</dd></div>
 					</div>
 				</dl>
 
-				<div class="stamp">
-					<span>{passport.state === 'rejected' ? 'IDV' : 'IDV CHECKED'}</span>
-					<b>{passport.state === 'verified' ? 'VERIFIED' : passport.state === 'adult' ? 'ADULT 18+' : 'REFUSED'}</b>
-					<span>IDENTITY VAULT</span>
-				</div>
+				<!-- Secondary "ghost" portrait, as printed on real data pages -->
+				{#if avatar && !photoFailed}
+					<div class="ghost"><img src={avatar} alt="" referrerpolicy="no-referrer" /></div>
+				{/if}
 
 				<div class="mrz" aria-hidden="true">
 					<span>{lines[0]}</span>
@@ -153,62 +163,61 @@
 			{/if}
 		</div>
 
-		<!-- Cover: front is the passport jacket, back is the verdict page -->
+		<!-- ═════ Cover: jacket on the front, observations page on the back ═════ -->
 		<div class="cover">
 			<div class="face front">
 				<div class="upright">
-					<div class="top">
-						<span class="foil title">HACK CLUB</span>
-						<span class="crest">
-							<i class="art" style="--src: url(/art/dino-wave.png)"></i>
-						</span>
-					</div>
-					{#if passport}
-						<span class="foil rule">✦ ✦ ✦</span>
-					{:else}
-						<a class="signin" href="/auth/login" data-sveltekit-reload>
-							<svg viewBox="0 0 24 24" aria-hidden="true"
-								><path
-									d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5Zm-3 8V7a3 3 0 0 1 6 0v3H9Zm3 3a2 2 0 0 1 1 3.7V19h-2v-2.3A2 2 0 0 1 12 13Z"
-								/></svg
-							>
-							Sign in with Hack Club
-						</a>
-					{/if}
-					<div class="bottom">
-						<span class="foil word">PASSPORT</span>
-						<span class="foil langs">PASSEPORT · PASAPORTE</span>
-						<span class="chip"></span>
-					</div>
+					<span class="foil nation">Hack Club</span>
+					<span class="emblem">
+						<i class="plate"></i>
+						<i class="etch"></i>
+					</span>
+					<span class="foil word">Passport</span>
+					<span class="foil langs">Passeport · Pasaporte</span>
+					<i class="epass foilmark"></i>
 				</div>
 			</div>
 
 			<div class="face back">
+				<div class="print upper"></div>
 				{#if passport}
-					<div class="band">
-						<span>HACK CLUB · IDENTITY VAULT</span>
-						<span class="clock">
-							{#if now}
-								<i class="live"></i>
-								{now.toLocaleTimeString('en-GB')} · {fmtDate(now)}
-							{/if}
-						</span>
-					</div>
-					<div class="verdict">
-						<span class="icon"><StateIcon state={passport.state} /></span>
-						<div class="words">
-							<b>{headline}</b>
-							<span>{subline}</span>
+					<p class="reserved">
+						Official observations <span>·</span> <i>Observations officielles</i>
+					</p>
+
+					<!-- The verdict, as an entry-clearance vignette -->
+					<div class="label">
+						<div class="band">
+							<span>Hack Club Identity Vault</span>
+							<span class="clock">
+								{#if now}
+									<i class="live"></i>
+									{now.toLocaleTimeString('en-GB')} · {fmtDate(now)}
+								{/if}
+							</span>
 						</div>
-						{#if passport.state !== 'rejected'}
-							<div class="qr">
-								<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG generated by our own server -->
-								<span>{#if qr}{@html qr}{/if}</span>
-								<small>STAFF SCAN</small>
+						<div class="verdict">
+							<span class="icon"><StateIcon state={passport.state} /></span>
+							<div class="words">
+								<b>{headline}</b>
+								<span>{subline}</span>
+								{#if passport.state === 'rejected'}
+									<small>Accepted: {ACCEPTED_BRIEF.join(' · ')}</small>
+								{/if}
 							</div>
-						{/if}
+							{#if passport.state !== 'rejected'}
+								<div class="qr">
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG generated by our own server -->
+									<span>{#if qr}{@html qr}{/if}</span>
+									<small>Staff scan</small>
+								</div>
+							{/if}
+						</div>
+						<div class="micro" aria-hidden="true">
+							<span>{`${passport.number}<<${microWord}<<HACK<CLUB<IDENTITY<VAULT<<`.repeat(6)}</span>
+						</div>
+						<div class="shine"></div>
 					</div>
-					<div class="shine"></div>
 				{/if}
 			</div>
 		</div>
@@ -217,7 +226,7 @@
 
 <style>
 	.scene {
-		--w: min(92vw, 58svh, 600px);
+		--w: min(94vw, 61svh, 640px);
 		--h: calc(var(--w) / 1.42);
 		position: relative;
 		width: var(--w);
@@ -229,62 +238,59 @@
 	/* The book's own box is the lower (data) page; the cover hinges on its top edge.
 	   Closed, the whole book is turned a quarter so the spine sits on the left. */
 	.book {
+		--closed: translateY(calc(var(--h) * -0.5)) rotateZ(-90deg) scale(1.28);
 		position: absolute;
 		left: 0;
 		top: var(--h);
 		width: var(--w);
 		height: var(--h);
 		font-size: calc(var(--w) / 100);
+		font-family: var(--text);
 		transform-style: preserve-3d;
-		transform: translateY(calc(var(--h) * -0.5)) rotateZ(-90deg);
+		transform: var(--closed);
 		animation: book-in 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 	}
-	.signed-in .book {
-		animation:
-			book-in 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) both,
-			book-turn 1.1s 1.1s cubic-bezier(0.65, 0, 0.25, 1) forwards;
-	}
-
 	.cover {
 		position: absolute;
 		inset: 0;
 		transform-style: preserve-3d;
 		transform-origin: 50% 0;
 		transform: translateZ(1px) rotateX(0deg);
+	}
+
+	/* Returning from sign-in: turn the book and fold it open on the verdict. */
+	.signed-in .book {
 		animation:
-			cover-ajar 1.1s 0.8s cubic-bezier(0.3, 0.8, 0.3, 1) forwards,
-			cover-breathe 4.5s 1.9s ease-in-out infinite alternate;
+			book-in 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) both,
+			book-turn 1.1s 1.1s cubic-bezier(0.65, 0, 0.25, 1) forwards;
 	}
 	.signed-in .cover {
 		animation: cover-open 1.5s 1.5s cubic-bezier(0.6, 0.05, 0.2, 1) forwards;
 	}
 
+	/* First visit: an unhurried opening that carries straight on into Hack Club sign-in. */
+	.entering .book {
+		animation:
+			book-in 1.4s cubic-bezier(0.2, 0.9, 0.25, 1) both,
+			book-enter 3.2s 1.9s cubic-bezier(0.55, 0, 0.3, 1) forwards;
+	}
+	.entering .cover {
+		animation: cover-enter 3s 1.9s cubic-bezier(0.5, 0, 0.25, 1) forwards;
+	}
+
 	@keyframes book-in {
 		from {
 			opacity: 0;
-			transform: translateY(calc(var(--h) * -0.5 + 8em)) rotateZ(-97deg) scale(0.86);
+			transform: translateY(calc(var(--h) * -0.5 + 8em)) rotateZ(-96deg) scale(1.08);
 		}
 		to {
 			opacity: 1;
-			transform: translateY(calc(var(--h) * -0.5)) rotateZ(-90deg) scale(1);
+			transform: var(--closed);
 		}
 	}
 	@keyframes book-turn {
 		to {
-			transform: translateY(0) rotateZ(0deg);
-		}
-	}
-	@keyframes cover-ajar {
-		to {
-			transform: translateZ(1px) rotateX(17deg);
-		}
-	}
-	@keyframes cover-breathe {
-		from {
-			transform: translateZ(1px) rotateX(17deg);
-		}
-		to {
-			transform: translateZ(1px) rotateX(11deg);
+			transform: translateY(0) rotateZ(0deg) scale(1);
 		}
 	}
 	@keyframes cover-open {
@@ -292,29 +298,55 @@
 			transform: translateZ(1px) rotateX(180deg);
 		}
 	}
+	/* The spread slides across so the opening page ends up filling the view. */
+	@keyframes book-enter {
+		55% {
+			transform: translate(calc(var(--h) * 0.37), calc(var(--h) * -0.5)) rotateZ(-90deg) scale(0.74);
+		}
+		to {
+			transform: translate(0, calc(var(--h) * -0.5)) rotateZ(-90deg) scale(4.4);
+		}
+	}
+	@keyframes cover-enter {
+		to {
+			transform: translateZ(1px) rotateX(172deg);
+		}
+	}
 
 	.page,
 	.face {
 		position: absolute;
 		inset: 0;
-		border-radius: 2.6em;
+		border-radius: 2.2em;
 		overflow: hidden;
 	}
 	.face {
 		backface-visibility: hidden;
 		-webkit-backface-visibility: hidden;
 	}
+	/* The ICAO biometric-passport symbol */
+	.epass {
+		display: block;
+		aspect-ratio: 433 / 247.5;
+		background: currentColor;
+		-webkit-mask: url(/art/epassport.svg) center / contain no-repeat;
+		mask: url(/art/epassport.svg) center / contain no-repeat;
+	}
 
-	/* ───────── Cover (front) ───────── */
+	/* ══════════ Cover ══════════ */
 	.front {
 		background:
-			radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.16), transparent 55%),
-			linear-gradient(180deg, rgba(0, 0, 0, 0.32), transparent 9%),
-			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"),
-			linear-gradient(200deg, #f04a61, var(--red) 40%, var(--red-deep));
+			/* soft sheen across the jacket */
+			linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.07) 48%, transparent 66%),
+			/* the spine crease (top edge here = left edge once the book stands upright) */
+			linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.06) 2.2%, rgba(255, 255, 255, 0.08) 3.2%, transparent 5%),
+			/* leather grain */
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .28 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"),
+			linear-gradient(190deg, #7f1a2f, var(--jacket) 45%, var(--jacket-deep));
 		box-shadow:
-			0 3em 6em -1em rgba(0, 0, 0, 0.6),
-			inset 0 0 0 0.25em rgba(0, 0, 0, 0.12);
+			0 0 0 0.1em rgba(0, 0, 0, 0.25),
+			0 3.5em 6em -1.5em rgba(20, 10, 15, 0.7),
+			0 1em 2em -0.5em rgba(20, 10, 15, 0.45);
 	}
 	/* Portrait artwork, pre-rotated so it stands upright while the book is closed. */
 	.upright {
@@ -324,189 +356,350 @@
 		width: var(--h);
 		height: var(--w);
 		transform: translate(-50%, -50%) rotate(90deg);
-		display: grid;
-		grid-template-rows: 1fr auto 1fr;
-		justify-items: center;
-		padding: 7em 5em 6em;
 		text-align: center;
 	}
-	.upright::before {
-		content: '';
+	.upright > * {
 		position: absolute;
-		inset: 2.6em;
-		border: 0.35em solid rgba(241, 217, 143, 0.55);
-		border-radius: 1.4em;
-		pointer-events: none;
-	}
-	.top,
-	.bottom {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-	}
-	.top {
-		gap: 3em;
-	}
-	.bottom {
-		justify-content: flex-end;
-		gap: 1.2em;
+		left: 50%;
+		transform: translateX(-50%);
 	}
 	.foil {
+		font-family: var(--serif);
+		text-transform: uppercase;
+		white-space: nowrap;
+		line-height: 1;
 		background: var(--foil);
-		background-size: 220% 100%;
+		background-size: 240% 100%;
 		-webkit-background-clip: text;
 		background-clip: text;
 		color: transparent;
-		font-weight: 700;
-		animation: foil 6s ease-in-out infinite alternate;
+		filter: drop-shadow(0 0.02em 0 rgba(40, 5, 10, 0.6));
+		animation: foil 7s ease-in-out infinite alternate;
 	}
 	@keyframes foil {
 		to {
 			background-position: 100% 0;
 		}
 	}
-	.title {
-		font-size: 7.4em;
-		letter-spacing: 0.14em;
-		margin-right: -0.14em;
-		line-height: 1;
+	.nation {
+		top: 1.05em;
+		font-size: 8.4em;
+		letter-spacing: 0.1em;
+		padding-left: 0.1em;
 	}
-	.crest {
-		width: 22em;
-		height: 22em;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-		color: var(--gold);
-		border: 0.5em solid currentColor;
-		box-shadow:
-			0 0 0 0.9em var(--red),
-			0 0 0 1.2em rgba(241, 217, 143, 0.7);
+	/* Gold-plated Hack Club sticker: a foil plate in the sticker's shape, with its line art engraved. */
+	.emblem {
+		top: 23em;
+		width: 36em;
+		aspect-ratio: 312 / 322;
+		filter: drop-shadow(0 0.4em 0.4em rgba(30, 0, 6, 0.5));
 	}
-	.crest .art {
-		width: 68%;
-		height: 74%;
+	.emblem i {
+		position: absolute;
+		inset: 0;
+	}
+	.plate {
 		background: var(--foil);
+		background-size: 240% 100%;
+		-webkit-mask: url(/art/emblem-body.png) center / contain no-repeat;
+		mask: url(/art/emblem-body.png) center / contain no-repeat;
+		animation: foil 7s ease-in-out infinite alternate;
 	}
-	.rule {
-		align-self: center;
-		font-size: 4em;
-		letter-spacing: 0.6em;
-	}
-	.signin {
-		align-self: center;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5em;
-		font-size: 3.9em;
-		font-weight: 700;
-		white-space: nowrap;
-		text-decoration: none;
-		color: #3a1a00;
-		padding: 0.72em 1.1em;
-		border-radius: 99em;
-		background: var(--foil);
-		background-size: 220% 100%;
-		box-shadow:
-			0 0.12em 0 #8c6a1f,
-			0 0.5em 1.2em rgba(0, 0, 0, 0.35),
-			inset 0 0.08em 0 rgba(255, 255, 255, 0.7);
-		animation: foil 3.5s ease-in-out infinite alternate;
-		transition: transform 0.15s ease;
-	}
-	.signin:hover,
-	.signin:focus-visible {
-		transform: scale(1.05);
-	}
-	.signin:focus-visible {
-		outline: 0.18em solid #fff;
-		outline-offset: 0.18em;
-	}
-	.signin svg {
-		width: 1.15em;
-		height: 1.15em;
-		fill: currentColor;
+	.etch {
+		background: #7c5210;
+		-webkit-mask: url(/art/emblem-lines.png) center / contain no-repeat;
+		mask: url(/art/emblem-lines.png) center / contain no-repeat;
+		filter: drop-shadow(0.09em 0.09em 0 rgba(255, 246, 205, 0.85));
 	}
 	.word {
-		font-size: 6.6em;
-		letter-spacing: 0.2em;
-		margin-right: -0.2em;
-		line-height: 1;
+		top: 9.5em;
+		font-size: 7em;
+		letter-spacing: 0.16em;
+		padding-left: 0.16em;
 	}
 	.langs {
-		font-size: 2.3em;
-		letter-spacing: 0.3em;
-		margin-right: -0.3em;
+		top: 32.4em;
+		font-size: 2.4em;
+		letter-spacing: 0.28em;
+		padding-left: 0.28em;
 	}
-	/* The e-passport biometric symbol */
-	.chip {
-		position: relative;
-		width: 9em;
-		height: 5.4em;
-		margin-top: 2em;
-		border-top: 1.3em solid var(--gold);
-		border-bottom: 1.3em solid var(--gold);
-	}
-	.chip::before {
-		content: '';
-		position: absolute;
-		left: 50%;
-		top: 50%;
-		width: 4.6em;
-		height: 4.6em;
-		transform: translate(-50%, -50%);
-		border-radius: 50%;
-		background: var(--red);
-		border: 1.2em solid var(--gold);
-	}
-	.chip::after {
-		content: '';
-		position: absolute;
-		inset: -1.3em 0;
-		border-left: 1.3em solid var(--gold);
-		border-right: 1.3em solid var(--gold);
-		clip-path: polygon(0 0, 100% 0, 100% 24%, 0 24%, 0 76%, 100% 76%, 100% 100%, 0 100%);
+	.foilmark {
+		bottom: 6em;
+		width: 10em;
+		background: var(--foil);
+		background-size: 240% 100%;
+		animation: foil 7s ease-in-out infinite alternate;
 	}
 
-	/* ───────── Verdict page (back of the cover) ───────── */
+	/* ══════════ Paper ══════════ */
+	.data,
+	.back {
+		background: var(--paper);
+		color: #20242c;
+	}
+	.data {
+		box-shadow:
+			0 0 0 0.1em rgba(0, 0, 0, 0.12),
+			0 3.5em 6em -1.5em rgba(10, 10, 20, 0.6),
+			inset 0 1.6em 2em -1.2em rgba(31, 45, 61, 0.3);
+	}
 	.back {
 		transform: rotateX(180deg);
+		box-shadow:
+			inset 0 0 0 0.1em rgba(0, 0, 0, 0.12),
+			inset 0 -1.6em 2em -1.2em rgba(31, 45, 61, 0.3);
+	}
+	.print {
+		position: absolute;
+		inset: 0;
 		background:
-			repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0 2em, transparent 2em 4em),
-			linear-gradient(160deg, var(--state), var(--state-deep));
-		color: var(--state-ink);
+			var(--rosette) 104% 30% / 36em 36em no-repeat,
+			var(--waves-rose) 0 0 / 40em 10em,
+			var(--waves-slate) 0 5em / 52em 13em,
+			linear-gradient(100deg, rgba(181, 71, 92, 0.16), rgba(244, 241, 234, 0) 45%, rgba(86, 116, 156, 0.18));
+		opacity: 0.3;
+	}
+	.print.upper {
+		background:
+			var(--rosette-slate) 50% 50% / 60em 60em no-repeat,
+			var(--waves-slate) 0 0 / 40em 10em,
+			var(--waves-rose) 0 5em / 52em 13em,
+			linear-gradient(260deg, rgba(181, 71, 92, 0.16), rgba(244, 241, 234, 0) 45%, rgba(86, 116, 156, 0.18));
+	}
+
+	/* ══════════ Data page ══════════ */
+	.doctype {
+		position: absolute;
+		left: 4.5em;
+		top: 3.2em;
 		display: flex;
 		flex-direction: column;
-		box-shadow: inset 0 -1.5em 2em -1em rgba(0, 0, 0, 0.35);
+		font-family: var(--serif);
+		text-transform: uppercase;
+		color: var(--print);
 	}
-	[data-state='rejected'] .back {
+	.doctype b {
+		font-size: 2.8em;
+		font-weight: 400;
+		letter-spacing: 0.1em;
+		line-height: 1.14;
+	}
+	.country {
+		position: absolute;
+		left: 5.5em;
+		top: 0.36em;
+		margin: 0;
+		font-family: var(--serif);
+		font-weight: 400;
+		font-size: 6.8em;
+		line-height: 1;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--print);
+	}
+	.data > .epass {
+		position: absolute;
+		right: 4.5em;
+		top: 3.5em;
+		width: 6.6em;
+		color: var(--print);
+	}
+
+	dl,
+	dd {
+		margin: 0;
+	}
+	dt {
+		font-size: 1.5em;
+		color: var(--label);
+		white-space: nowrap;
+		line-height: 1.25;
+	}
+	dt i {
+		font-style: italic;
+	}
+	dd {
+		font-family: var(--mono);
+		font-size: 2.6em;
+		line-height: 1.15;
+		text-transform: uppercase;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.meta {
+		position: absolute;
+		left: 37.5em;
+		right: 4.5em;
+		top: 11em;
+		display: flex;
+		gap: 5em;
+	}
+	.fields {
+		position: absolute;
+		left: 37.5em;
+		width: 47em;
+		top: 17.2em;
+		display: flex;
+		flex-direction: column;
+		gap: 1.3em;
+	}
+	.row {
+		display: flex;
+		gap: 2.6em;
+	}
+	.row > div {
+		flex: none;
+		min-width: 0;
+	}
+
+	.photo {
+		position: absolute;
+		left: 4.5em;
+		top: 11em;
+		width: 30em;
+		height: 30em;
+		overflow: hidden;
+		background: linear-gradient(170deg, #e4e7ec, #cdd3db);
+		color: #77879b;
+		display: grid;
+		place-items: center;
+	}
+	.photo > .art {
+		width: 66%;
+		height: 60%;
+	}
+	.photo img,
+	.ghost img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		filter: grayscale(1) contrast(1.06);
+	}
+	.ghost {
+		position: absolute;
+		right: 4.5em;
+		top: 16.5em;
+		width: 11em;
+		height: 11em;
+		overflow: hidden;
+		opacity: 0.38;
+		mix-blend-mode: multiply;
+		-webkit-mask: radial-gradient(closest-side, #000 62%, transparent 100%);
+		mask: radial-gradient(closest-side, #000 62%, transparent 100%);
+	}
+
+	.mrz {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 13.4em;
+		padding: 0 4.5em;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 0.9em;
+		background: rgba(255, 255, 255, 0.8);
+		font-family: var(--mono);
+	}
+	.mrz span {
+		font-size: 2.95em;
+		line-height: 1;
+		white-space: nowrap;
+		letter-spacing: 0.04em;
+	}
+	.holo {
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(
+			115deg,
+			transparent 25%,
+			rgba(255, 90, 120, 0.22) 38%,
+			rgba(255, 220, 120, 0.22) 45%,
+			rgba(120, 255, 190, 0.22) 52%,
+			rgba(120, 180, 255, 0.22) 59%,
+			rgba(210, 140, 255, 0.22) 66%,
+			transparent 79%
+		);
+		background-size: 300% 100%;
+		mix-blend-mode: soft-light;
+		animation: sweep 6s linear infinite;
+		pointer-events: none;
+	}
+	@keyframes sweep {
+		from {
+			background-position: 150% 0;
+		}
+		to {
+			background-position: -50% 0;
+		}
+	}
+
+	/* ══════════ Observations page (back of the cover) ══════════ */
+	.reserved {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 1.5em;
+		margin: 0;
+		text-align: center;
+		font-family: var(--serif);
+		font-size: 2.3em;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--print);
+	}
+	.reserved i {
+		font-style: normal;
+		opacity: 0.7;
+	}
+	.label {
+		position: absolute;
+		left: 4.5em;
+		right: 4.5em;
+		top: 8.6em;
+		bottom: 4.5em;
+		border-radius: 0.8em;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		color: var(--state-ink);
 		background:
-			repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.28) 0 3em, transparent 3em 6em),
-			linear-gradient(160deg, var(--state), var(--state-deep));
+			var(--waves-white) 0 0 / 46em 11.5em,
+			linear-gradient(165deg, var(--state), var(--state-deep));
+		background-blend-mode: soft-light, normal;
+		box-shadow:
+			inset 0 0 0 0.25em rgba(255, 255, 255, 0.55),
+			0 0.2em 0.5em rgba(31, 45, 61, 0.35);
 	}
 	.band {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
-		padding: 3em 4.5em 0;
-		font-size: 1em;
-		font-weight: 700;
-		letter-spacing: 0.12em;
+		align-items: baseline;
+		padding: 2.8em 4em 0;
 	}
 	.band span {
-		font-size: 2.5em;
+		font-family: var(--serif);
+		font-size: 2.3em;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
 	}
-	.clock {
+	.band .clock {
 		font-family: var(--mono);
-		letter-spacing: 0.04em;
+		font-size: 2.1em;
+		letter-spacing: 0;
+		white-space: nowrap;
 		font-variant-numeric: tabular-nums;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5em;
 	}
 	.live {
-		width: 0.7em;
-		height: 0.7em;
+		width: 0.6em;
+		height: 0.6em;
 		border-radius: 50%;
 		background: currentColor;
 		animation: pulse 1s steps(2, jump-none) infinite;
@@ -520,330 +713,95 @@
 		flex: 1;
 		display: flex;
 		align-items: center;
-		gap: 4em;
-		padding: 0 4.5em 2em;
+		gap: 3em;
+		padding: 0 4em;
 	}
 	.icon {
 		flex: none;
-		width: 24em;
-		height: 24em;
-		filter: drop-shadow(0 0.6em 0.8em rgba(0, 0, 0, 0.25));
+		width: 17em;
+		height: 17em;
 	}
 	.words {
 		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 1em;
+		gap: 1.2em;
 	}
 	.words b {
-		font-size: 9.6em;
-		line-height: 0.92;
+		font-family: var(--serif);
+		font-weight: 400;
+		font-size: 8em;
+		line-height: 0.9;
 		letter-spacing: 0.01em;
-	}
-	.words span {
-		font-size: 3.5em;
-		font-weight: 700;
-		line-height: 1.15;
+		text-transform: uppercase;
+		white-space: nowrap;
 	}
 	[data-state='rejected'] .words b {
-		font-size: 10.5em;
+		font-size: 7em;
+	}
+	.words span {
+		font-size: 2.9em;
+		font-weight: 700;
+		line-height: 1.15;
+		white-space: nowrap;
+	}
+	.words small {
+		font-family: var(--mono);
+		font-size: 1.7em;
+		line-height: 1.45;
+		text-transform: uppercase;
 	}
 	.qr {
 		flex: none;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.8em;
+		gap: 0.9em;
 	}
+	/* White quiet zone on all sides, and no rounding that could clip the finder squares. */
 	.qr span {
 		display: block;
-		width: 21em;
-		height: 21em;
-		border-radius: 1.2em;
+		width: 17.5em;
+		height: 17.5em;
+		padding: 1.2em;
 		background: #fff;
-		overflow: hidden;
-		box-shadow: 0 0.6em 1.4em rgba(0, 0, 0, 0.3);
+		border-radius: 0.5em;
 	}
 	.qr span :global(svg) {
 		display: block;
 		width: 100%;
 		height: 100%;
+		shape-rendering: crispEdges;
 	}
 	.qr small {
+		font-family: var(--serif);
 		font-size: 2em;
-		font-weight: 700;
 		letter-spacing: 0.2em;
+		text-transform: uppercase;
+	}
+	/* Microprint, clipped evenly at both ends */
+	.micro {
+		display: flex;
+		justify-content: center;
+		margin: 0 4em 2.6em;
+		overflow: hidden;
+		font-family: var(--mono);
+		font-size: 1.1em;
+		letter-spacing: 0.1em;
+		white-space: nowrap;
+		opacity: 0.75;
+	}
+	.micro span {
+		flex: none;
 	}
 	/* A band of light that keeps sweeping: a screenshot can't do this. */
 	.shine {
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(
-			105deg,
-			transparent 40%,
-			rgba(255, 255, 255, 0.28) 50%,
-			transparent 60%
-		);
+		background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.28) 50%, transparent 60%);
 		background-size: 300% 100%;
 		animation: sweep 3.2s linear infinite;
-		pointer-events: none;
-	}
-	@keyframes sweep {
-		from {
-			background-position: 150% 0;
-		}
-		to {
-			background-position: -50% 0;
-		}
-	}
-
-	/* ───────── Data page ───────── */
-	.data {
-		background: var(--paper);
-		color: var(--ink);
-		box-shadow:
-			0 3em 6em -1em rgba(0, 0, 0, 0.6),
-			inset 0 1.5em 2em -1em rgba(0, 0, 0, 0.3);
-	}
-	.guilloche {
-		position: absolute;
-		inset: 0;
-		background:
-			repeating-radial-gradient(circle at 12% 18%, rgba(236, 55, 80, 0.1) 0 0.18em, transparent 0.18em 1.5em),
-			repeating-radial-gradient(circle at 88% 70%, rgba(51, 142, 218, 0.1) 0 0.18em, transparent 0.18em 1.7em),
-			repeating-radial-gradient(circle at 50% 120%, rgba(241, 196, 15, 0.12) 0 0.18em, transparent 0.18em 1.3em),
-			linear-gradient(120deg, rgba(236, 55, 80, 0.07), rgba(51, 142, 218, 0.07));
-	}
-	.wm {
-		position: absolute;
-		pointer-events: none;
-	}
-	.wm.skyline {
-		left: 0;
-		right: 0;
-		bottom: 13.5em;
-		height: 18em;
-		color: rgba(236, 55, 80, 0.16);
-		-webkit-mask-size: 100% 100%;
-		mask-size: 100% 100%;
-	}
-	.wm.dino {
-		right: 3em;
-		top: 13em;
-		width: 26em;
-		height: 34em;
-		color: rgba(31, 45, 61, 0.09);
-	}
-	.wm.bridge {
-		right: 31em;
-		top: 2.2em;
-		width: 12em;
-		height: 6em;
-		color: rgba(51, 142, 218, 0.3);
-	}
-
-	header {
-		position: absolute;
-		left: 4.5em;
-		right: 4.5em;
-		top: 3em;
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-	}
-	.issuer {
-		display: flex;
-		flex-direction: column;
-	}
-	.issuer b {
-		font-size: 4.6em;
-		line-height: 1;
-		letter-spacing: 0.06em;
-		color: var(--red);
-	}
-	.issuer span {
-		font-size: 1.75em;
-		letter-spacing: 0.16em;
-		color: #5b6b80;
-		margin-top: 0.35em;
-	}
-	dl,
-	dd {
-		margin: 0;
-	}
-	dt {
-		font-size: 1.7em;
-		color: #5b6b80;
-		white-space: nowrap;
-	}
-	dt i {
-		opacity: 0.75;
-	}
-	dd {
-		font-size: 3.15em;
-		font-weight: 700;
-		line-height: 1.1;
-		text-transform: uppercase;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.doc {
-		display: flex;
-		gap: 3.5em;
-	}
-	.num {
-		font-family: var(--mono);
-		letter-spacing: 0.06em;
-		color: var(--red-deep);
-	}
-
-	.photo {
-		position: absolute;
-		left: 4.5em;
-		top: 12.5em;
-		width: 26em;
-		height: 33em;
-		border-radius: 1.2em;
-		background: linear-gradient(160deg, #dfe6ee, #c5d0dc);
-		box-shadow:
-			0 0 0 0.3em #fff,
-			0 0 0 0.5em rgba(31, 45, 61, 0.25);
-		color: #7b8ba0;
-		display: grid;
-		place-items: center;
-	}
-	.photo > .art {
-		width: 70%;
-		height: 60%;
-	}
-	.photo img {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		border-radius: inherit;
-	}
-	.kinegram {
-		position: absolute;
-		right: -3em;
-		bottom: -2.5em;
-		width: 11em;
-		height: 11em;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-		background: conic-gradient(from 0deg, #ff8a9b, #ffd98a, #9af0c8, #8ac6ff, #d4a5ff, #ff8a9b);
-		opacity: 0.82;
-		box-shadow: inset 0 0 0 0.3em rgba(255, 255, 255, 0.7);
-		animation: spin 7s linear infinite;
-	}
-	.kinegram .art {
-		width: 58%;
-		height: 58%;
-		color: rgba(255, 255, 255, 0.92);
-		animation: spin 7s linear infinite reverse;
-	}
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	.fields {
-		position: absolute;
-		left: 35.5em;
-		right: 4.5em;
-		top: 12em;
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.25em 3em;
-	}
-	.fields > div {
-		min-width: 0;
-	}
-	.fields .wide {
-		grid-column: 1 / -1;
-	}
-
-	.stamp {
-		position: absolute;
-		right: 3.5em;
-		bottom: 15.5em;
-		width: 23em;
-		height: 23em;
-		border-radius: 50%;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.6em;
-		color: var(--state);
-		border: 0.7em solid currentColor;
-		outline: 0.25em solid currentColor;
-		outline-offset: -1.6em;
-		transform: rotate(-14deg) scale(2.2);
-		opacity: 0;
-		mix-blend-mode: multiply;
-		animation: stamp 0.35s 3.1s cubic-bezier(0.3, 1.4, 0.5, 1) forwards;
-	}
-	.stamp span {
-		font-size: 1.7em;
-		font-weight: 700;
-		letter-spacing: 0.18em;
-	}
-	.stamp b {
-		font-size: 3.5em;
-		letter-spacing: 0.04em;
-		border-block: 0.1em solid currentColor;
-		padding: 0.1em 0.2em;
-	}
-	@keyframes stamp {
-		to {
-			transform: rotate(-14deg) scale(1);
-			opacity: 0.82;
-		}
-	}
-
-	.mrz {
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		height: 13.5em;
-		padding: 0 4.5em;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		gap: 0.6em;
-		background: rgba(255, 255, 255, 0.55);
-		border-top: 0.15em solid rgba(31, 45, 61, 0.15);
-		font-family: var(--mono);
-	}
-	.mrz span {
-		font-size: 3.2em;
-		line-height: 1;
-		white-space: nowrap;
-		letter-spacing: 0.052em;
-	}
-	.holo {
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(
-			115deg,
-			transparent 20%,
-			rgba(255, 90, 120, 0.35) 34%,
-			rgba(255, 220, 120, 0.35) 42%,
-			rgba(120, 255, 190, 0.35) 50%,
-			rgba(120, 180, 255, 0.35) 58%,
-			rgba(210, 140, 255, 0.35) 66%,
-			transparent 80%
-		);
-		background-size: 300% 100%;
-		mix-blend-mode: soft-light;
-		animation: sweep 5s linear infinite;
 		pointer-events: none;
 	}
 </style>

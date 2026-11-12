@@ -1,12 +1,15 @@
 import { dev } from '$app/environment';
 import { error, redirect } from '@sveltejs/kit';
-import { toPassport } from '$lib/server/hca';
+import { env } from '$env/dynamic/private';
+import { isConfigured, toPassport } from '$lib/server/hca';
 import { setSession } from '$lib/server/session';
 import type { RequestHandler } from './$types';
 
 /** Development-only: preview each passport state without a Hack Club OAuth app. */
 export const GET: RequestHandler = async ({ url, cookies }) => {
-	if (!dev) error(404, 'Not found');
+	// Only while no OAuth app is configured, so real sign-in never mixes with fake identities.
+	// DEMO=1 forces it on for design work.
+	if (!dev || (isConfigured() && env.DEMO !== '1')) error(404, 'Not found');
 	const as = url.searchParams.get('as') ?? 'verified';
 	const full = url.searchParams.has('full');
 	const passport = toPassport({

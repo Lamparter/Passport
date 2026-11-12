@@ -1,3 +1,4 @@
+import { dev } from '$app/environment';
 import { error, json } from '@sveltejs/kit';
 import QRCode from 'qrcode';
 import { origin } from '$lib/server/hca';
@@ -11,9 +12,10 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	const target = `${origin(url)}/verify/${await sealScan(passport)}`;
 	const svg = await QRCode.toString(target, {
 		type: 'svg',
-		errorCorrectionLevel: 'L',
-		margin: 1,
+		errorCorrectionLevel: 'M',
+		margin: 0,
 		color: { dark: '#17171d', light: '#ffffff' }
 	});
-	return json({ svg, ttl: SCAN_TTL });
+	// The raw link is only exposed in development, for testing the staff page without a camera.
+	return json({ svg, ttl: SCAN_TTL, ...(dev ? { url: target } : {}) });
 };

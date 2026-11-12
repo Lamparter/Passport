@@ -1,7 +1,7 @@
 import { dev } from '$app/environment';
 import type { Cookies } from '@sveltejs/kit';
-import type { Passport } from '$lib/types';
-import { seal, unseal } from './seal';
+import type { Passport, PassportState, ScanInfo } from '$lib/types';
+import { seal, sealCompact, unseal, unsealCompact } from './seal';
 
 const COOKIE = 'passport';
 /** Long enough for one event day; after that the status is re-checked with Hack Club. */
@@ -30,10 +30,32 @@ export function clearSession(cookies: Cookies) {
 	cookies.delete(COOKIE, { path: '/' });
 }
 
-export function sealScan(passport: Passport) {
-	return seal({ p: passport }, 'scan', SCAN_TTL);
+const STATES: PassportState[] = ['verified', 'adult', 'rejected'];
+type ScanTuple = [number, string, string, string, string | null, number | null, number];
+
+/** Only what door staff need, packed tightly so the QR code stays coarse and easy to scan. */
+export function sealScan(p: Passport) {
+	const tuple: ScanTuple = [
+		STATES.indexOf(p.state),
+		p.givenNames,
+		p.surname,
+		p.number,
+		p.slackId,
+		p.age,
+		Math.floor(p.issuedAt / 1000)
+	];
+	return sealCompact(tuple, 'scan', SCAN_TTL);
 }
 
-export function unsealScan(token: string) {
-	return unseal<{ p: Passport }>(token, 'scan');
+export async function unsealScan(
+	token: string
+): Promise<{ ok: true; scan: ScanInfo; sealedAt: number } | { ok: false; reason: 'expired' | 'invalid' }> {
+	const result = await unsealCompact<ScanTuple>(token, 'scan');
+	if (!result.ok) return result;
+	const [state, givenNames, surname, number, slackId, age, issued] = result.payload;
+	return {
+		ok: true,
+		scan: { state: STATES[state] ?? 'rejected', givenNames, surname, number, slackId, age, issuedAt: issued * 1000 },
+		sealedAt: (result.exp - SCAN_TTL) * 1000
+	};
 }

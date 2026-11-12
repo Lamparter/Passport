@@ -1,22 +1,24 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Passport from '$lib/Passport.svelte';
-	import StateIcon from '$lib/StateIcon.svelte';
 	import { ACCEPTED_ID, STATE_LABEL } from '$lib/types';
 
 	let { data } = $props();
 	const passport = $derived(data.passport);
+	const entering = $derived(data.auto || data.preview);
 
-	const reason = $derived.by(() => {
-		switch (passport?.status) {
-			case 'pending':
-				return 'Your Hack Club identity verification is still being reviewed.';
-			case 'needs_submission':
-				return "You haven't submitted ID to Hack Club's Identity Vault yet.";
-			case 'ineligible':
-				return 'Your Hack Club identity verification was rejected.';
-			default:
-				return "We couldn't confirm a verified Hack Club identity for this account.";
-		}
+	onMount(() => {
+		if (!data.auto) return;
+		// Leave as the opening animation finishes (see the `entering` timings in Passport.svelte).
+		const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const timer = setTimeout(() => location.assign('/auth/login'), calm ? 900 : 5000);
+		// Coming back with the browser's Back button restores this page mid-fade: start over.
+		const restored = (e: PageTransitionEvent) => e.persisted && location.reload();
+		addEventListener('pageshow', restored);
+		return () => {
+			clearTimeout(timer);
+			removeEventListener('pageshow', restored);
+		};
 	});
 </script>
 
@@ -24,86 +26,61 @@
 	<title>{passport ? `${STATE_LABEL[passport.state]} · ` : ''}Hack Club Passport</title>
 	<meta
 		name="description"
-		content="Show you're an identity-verified Hack Clubber at the door. Sign in with Hack Club to open your passport."
+		content="Show you're an identity-verified Hack Clubber at the door. Your passport opens once you sign in with Hack Club."
 	/>
 </svelte:head>
 
-<main class:signed-in={passport} data-state={passport?.state}>
+<main class:signed-in={passport} class:entering data-state={passport?.state}>
 	<div class="flood"></div>
 	<i class="art skyline" style="--src: url(/art/skyline.png)"></i>
 
-	<nav>
-		<span class="brand"><b>Hack Club</b> Passport</span>
-		{#if passport}
-			<form method="POST" action="/auth/logout">
-				<button type="submit">Sign out</button>
-			</form>
-		{/if}
-	</nav>
+	{#if data.error}
+		<p class="error" role="alert">{data.error}</p>
+	{/if}
 
-	<Passport {passport} />
+	<h1 class="sr">
+		{passport ? `Hack Club Passport: ${STATE_LABEL[passport.state]}` : 'Hack Club Passport'}
+	</h1>
 
-	<section class="brief">
+	<div class="desk">
+		<Passport {passport} {entering} />
 		{#if !passport}
-			{#if data.error}
-				<p class="error" role="alert">{data.error}</p>
-			{/if}
-			<h1>Your Hack Club ID, at the door.</h1>
-			<p>
-				Sign in with Hack Club and your passport opens to show whether you're an identity-verified
-				Hack Clubber. No physical ID needed if you are.
-			</p>
-			{#if data.demo}
-				<p class="demo">
-					Dev preview:
-					<a href="/auth/demo?as=verified" data-sveltekit-reload>verified</a>
-					<a href="/auth/demo?as=verified&full" data-sveltekit-reload>verified (HQ scopes)</a>
-					<a href="/auth/demo?as=adult" data-sveltekit-reload>18+</a>
-					<a href="/auth/demo?as=rejected" data-sveltekit-reload>not verified</a>
-				</p>
-			{/if}
-		{:else}
-			<div class="callout" role="status">
-				<span class="icon"><StateIcon state={passport.state} /></span>
-				<div>
-					<h1>{STATE_LABEL[passport.state]}</h1>
-					{#if passport.state === 'verified'}
-						<p>Show this screen to event staff. No other ID needed.</p>
-					{:else if passport.state === 'adult'}
-						<p>You're verified, but 18 or over. Please make yourself known to event staff.</p>
-					{:else}
-						<p>Please present another form of ID to event staff.</p>
-					{/if}
-				</div>
-			</div>
-
-			{#if passport.state === 'rejected'}
-				<div class="card">
-					<p>{reason}</p>
-					<h2>Accepted physical ID</h2>
-					<ul>
-						{#each ACCEPTED_ID.physical as id (id)}<li>{id}</li>{/each}
-					</ul>
-					<h2>Accepted digital ID</h2>
-					<ul>
-						{#each ACCEPTED_ID.digital as id (id)}<li>{id}</li>{/each}
-					</ul>
-					<p class="fine">
-						Want to use your passport next time? Verify your identity at
-						<a href="https://auth.hackclub.com" rel="noreferrer">auth.hackclub.com</a>, then sign in
-						again.
-					</p>
-				</div>
-			{:else}
-				<p class="fine">
-					Staff: the clock and light sweep are live. Scan the QR code to confirm this passport on
-					your own phone. The code changes every minute.
-				</p>
-			{/if}
+			<!-- The whole passport is the way in: no button on the jacket. -->
+			<a class="open" href="/auth/login" data-sveltekit-reload aria-label="Sign in with Hack Club"></a>
 		{/if}
-	</section>
+	</div>
 
-	<footer>An unofficial companion to Hack Club Identity Vault · passport.lamparter.dev</footer>
+	<footer>
+		{#if passport?.state === 'rejected'}
+			<details>
+				<summary>Accepted forms of ID</summary>
+				<ul>
+					{#each [...ACCEPTED_ID.physical, ...ACCEPTED_ID.digital] as id (id)}<li>{id}</li>{/each}
+				</ul>
+			</details>
+		{/if}
+		<div class="line">
+			<span>An unofficial companion to Hack Club Identity Vault</span>
+			{#if passport}
+				<form method="POST" action="/auth/logout"><button type="submit">Sign out</button></form>
+			{:else if !entering}
+				<a href="/auth/login" data-sveltekit-reload>Sign in with Hack Club</a>
+			{/if}
+			{#if data.demo}
+				<span class="demo">
+					Demo:
+					<a href="/?enter" data-sveltekit-reload>intro</a>
+					<a href="/auth/demo?as=verified" data-sveltekit-reload>verified</a>
+					<a href="/auth/demo?as=verified&full" data-sveltekit-reload>full</a>
+					<a href="/auth/demo?as=adult" data-sveltekit-reload>18+</a>
+					<a href="/auth/demo?as=rejected" data-sveltekit-reload>refused</a>
+				</span>
+			{/if}
+		</div>
+	</footer>
+
+	<!-- Fades the opening page into Hack Club's sign-in page. -->
+	{#if entering}<div class="veil"></div>{/if}
 </main>
 
 <style>
@@ -113,12 +90,12 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: clamp(0.75rem, 2.5svh, 1.75rem);
-		padding: 0 4vw calc(1rem + env(safe-area-inset-bottom));
+		justify-content: center;
+		padding: calc(1rem + env(safe-area-inset-top)) 3vw calc(3.25rem + env(safe-area-inset-bottom));
 		overflow: hidden;
-		background:
-			radial-gradient(90% 60% at 50% 35%, #2a2a3a 0%, transparent 70%),
-			linear-gradient(180deg, var(--dark), var(--darker));
+		/* A pale desk: the dark jacket stands clear of it, as the pale pages do of the verdict colour. */
+		background: radial-gradient(120% 90% at 50% 40%, #f7f8fa 0%, #e6e9ee 60%, #d6dae1 100%);
+		color: #3c4858;
 		isolation: isolate;
 	}
 
@@ -127,183 +104,163 @@
 		position: absolute;
 		inset: 0;
 		z-index: -2;
-		background:
-			radial-gradient(80% 55% at 50% 40%, rgba(255, 255, 255, 0.22), transparent 70%),
-			linear-gradient(180deg, var(--state, transparent), var(--state-deep, transparent));
-		clip-path: circle(0% at 50% 45%);
+		background: radial-gradient(110% 80% at 50% 45%, var(--stage, transparent), var(--stage-deep, transparent));
+		clip-path: circle(0% at 50% 50%);
 	}
 	[data-state='rejected'] .flood {
 		background:
-			repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.22) 0 28px, transparent 28px 56px),
-			linear-gradient(180deg, var(--state), var(--state-deep));
+			repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.2) 0 28px, transparent 28px 56px),
+			radial-gradient(110% 80% at 50% 45%, var(--stage), var(--stage-deep));
 	}
 	.signed-in .flood {
 		animation: flood 1.2s 2s cubic-bezier(0.5, 0, 0.2, 1) forwards;
 	}
 	@keyframes flood {
 		to {
-			clip-path: circle(150% at 50% 45%);
+			clip-path: circle(150% at 50% 50%);
 		}
 	}
 
+	/* Drawn at its natural proportions and capped, so it never stretches on wide screens. */
 	.skyline {
 		position: absolute;
 		z-index: -1;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		height: min(24vw, 22svh);
-		color: rgba(255, 255, 255, 0.07);
-		-webkit-mask-size: 100% 100%;
-		mask-size: 100% 100%;
+		left: 50%;
+		bottom: calc(2.4rem + env(safe-area-inset-bottom));
+		width: min(100%, 44rem);
+		aspect-ratio: 4 / 1;
+		transform: translateX(-50%);
+		color: rgba(60, 72, 88, 0.16);
 		-webkit-mask-position: bottom;
 		mask-position: bottom;
 	}
+	.signed-in .skyline {
+		color: rgba(255, 255, 255, 0.12);
+		transition: color 0.6s 2.4s;
+	}
 
-	nav {
-		width: 100%;
-		max-width: 60rem;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		min-height: 3.25rem;
-		padding-top: env(safe-area-inset-top);
+	.sr {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
-	.brand {
-		font-size: 0.95rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		opacity: 0.9;
+
+	.desk {
+		position: relative;
 	}
-	.brand b {
-		background: var(--red);
-		padding: 0.2em 0.5em;
-		border-radius: 0.35em;
-		margin-right: 0.2em;
+	.open {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		border-radius: 1rem;
 	}
-	nav button {
+	.open:focus-visible {
+		outline: 3px solid var(--blue);
+		outline-offset: 6px;
+	}
+
+	.error {
+		position: absolute;
+		top: calc(1rem + env(safe-area-inset-top));
+		left: 50%;
+		transform: translateX(-50%);
+		width: max-content;
+		max-width: 92vw;
+		margin: 0;
+		font-size: 0.9rem;
+		color: #7a1023;
+		background: #fde8ec;
+		border: 1px solid #e9a3b0;
+		border-radius: 0.6rem;
+		padding: 0.55rem 0.9rem;
+	}
+
+	footer {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: calc(0.8rem + env(safe-area-inset-bottom));
+		padding: 0 4vw;
+		font-size: 0.74rem;
+		letter-spacing: 0.02em;
+		text-align: center;
+		animation: rise 0.7s 1.6s both;
+	}
+	footer a,
+	footer button,
+	summary {
 		font: inherit;
-		font-size: 0.85rem;
-		font-weight: 700;
+		letter-spacing: inherit;
 		color: inherit;
-		background: rgba(0, 0, 0, 0.28);
-		border: 1px solid rgba(255, 255, 255, 0.35);
-		border-radius: 99em;
-		padding: 0.45em 1em;
+		background: none;
+		border: 0;
+		padding: 0;
+		text-decoration: underline;
+		text-underline-offset: 0.2em;
 		cursor: pointer;
 	}
-	nav button:hover {
-		background: rgba(0, 0, 0, 0.45);
-	}
-
-	.brief {
-		width: 100%;
-		max-width: 34rem;
-		text-align: center;
-		animation: rise 0.7s 1.4s both;
-	}
-	.signed-in .brief {
-		animation-delay: 2.9s;
-		color: var(--state-ink);
+	.signed-in footer {
+		animation-delay: 3s;
+		color: rgba(255, 255, 255, 0.85);
 	}
 	@keyframes rise {
 		from {
 			opacity: 0;
-			transform: translateY(12px);
 		}
 	}
-	h1 {
-		margin: 0 0 0.4rem;
-		font-size: clamp(1.4rem, 5vw, 2rem);
-		line-height: 1.1;
-		text-wrap: balance;
-	}
-	p {
-		margin: 0 0 0.75rem;
-		line-height: 1.45;
-		text-wrap: pretty;
-	}
-	.brief > p {
-		opacity: 0.85;
-	}
-	.error {
-		background: rgba(236, 55, 80, 0.18);
-		border: 1px solid var(--red);
-		border-radius: 0.6rem;
-		padding: 0.6rem 0.9rem;
-		opacity: 1 !important;
-	}
-	.demo {
-		font-size: 0.85rem;
+	.line {
+		margin: 0;
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: center;
-		gap: 0.4rem 0.9rem;
+		gap: 0.15rem 0.9rem;
 	}
-
-	.callout {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
+	footer form {
+		display: inline;
+	}
+	.demo {
+		display: inline-flex;
+		gap: 0.6rem;
+	}
+	details {
+		margin-bottom: 0.5rem;
+	}
+	summary {
+		display: inline-block;
+		list-style: none;
+	}
+	summary::-webkit-details-marker {
+		display: none;
+	}
+	details ul {
+		list-style: none;
+		margin: 0.5rem auto 0.3rem;
+		padding: 0.7rem 1rem;
+		max-width: 26rem;
 		text-align: left;
-		margin-bottom: 0.9rem;
-	}
-	.callout .icon {
-		flex: none;
-		width: clamp(3.5rem, 16vw, 5rem);
-		height: clamp(3.5rem, 16vw, 5rem);
-	}
-	.callout h1 {
-		font-size: clamp(2.2rem, 10.5vw, 3.6rem);
-		text-transform: uppercase;
-		letter-spacing: 0.01em;
-		line-height: 0.95;
-		margin-bottom: 0.3rem;
-	}
-	.callout p {
-		margin: 0;
-		font-weight: 700;
-		font-size: clamp(0.95rem, 3.6vw, 1.15rem);
-		line-height: 1.25;
-	}
-
-	.card {
-		text-align: left;
-		background: rgba(0, 0, 0, 0.42);
-		border: 1px solid rgba(255, 255, 255, 0.28);
-		border-radius: 1rem;
-		padding: 1rem 1.2rem;
+		font-size: 0.82rem;
+		line-height: 1.55;
 		color: #fff;
-	}
-	.card h2 {
-		font-size: 0.8rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		margin: 0.9rem 0 0.35rem;
-		opacity: 0.8;
-	}
-	.card ul {
-		margin: 0;
-		padding-left: 1.2rem;
-		line-height: 1.5;
-	}
-	.fine {
-		font-size: 0.85rem;
-		opacity: 0.85;
-		margin: 0.9rem 0 0;
+		background: rgba(0, 0, 0, 0.6);
+		border-radius: 0.8rem;
+		backdrop-filter: blur(6px);
 	}
 
-	footer {
-		margin-top: auto;
-		padding-top: 1rem;
-		font-size: 0.72rem;
-		letter-spacing: 0.04em;
-		opacity: 0.55;
-		text-align: center;
+	.veil {
+		position: fixed;
+		inset: 0;
+		z-index: 5;
+		background: #f9fafc;
+		opacity: 0;
+		pointer-events: none;
+		animation: veil 1s 4s ease-in forwards;
 	}
-	.signed-in footer {
-		color: var(--state-ink);
-		opacity: 0.7;
+	@keyframes veil {
+		to {
+			opacity: 1;
+		}
 	}
 </style>

@@ -5,9 +5,13 @@ import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
 	const expected = cookies.get('oauth_state');
-	cookies.delete('oauth_state', { path: '/auth' });
+	cookies.delete('oauth_state', { path: '/' });
 
-	if (url.searchParams.get('error')) redirect(303, '/?error=denied');
+	const refused = url.searchParams.get('error');
+	if (refused) {
+		console.error('Hack Club sign-in refused:', refused, url.searchParams.get('error_description'));
+		redirect(303, refused === 'access_denied' ? '/?error=denied' : '/?error=signin');
+	}
 
 	const code = url.searchParams.get('code');
 	const state = url.searchParams.get('state');
