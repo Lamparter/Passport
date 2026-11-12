@@ -62,7 +62,7 @@
 		<div class="line">
 			<span>An unofficial companion to Hack Club Identity Vault</span>
 			{#if passport}
-				<form method="POST" action="/auth/logout"><button type="submit">Sign out</button></form>
+				<a href="/auth/logout" data-sveltekit-reload>Sign out</a>
 			{:else if !entering}
 				<a href="/auth/login" data-sveltekit-reload>Sign in with Hack Club</a>
 			{/if}
@@ -190,7 +190,6 @@
 		animation: rise 0.7s 1.6s both;
 	}
 	footer a,
-	footer button,
 	summary {
 		font: inherit;
 		letter-spacing: inherit;
@@ -217,9 +216,6 @@
 		flex-wrap: wrap;
 		justify-content: center;
 		gap: 0.15rem 0.9rem;
-	}
-	footer form {
-		display: inline;
 	}
 	.demo {
 		display: inline-flex;

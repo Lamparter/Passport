@@ -146,7 +146,7 @@
 							<dt>Date of issue/<i>Date de délivrance</i> (7)</dt>
 							<dd>{fmtDate(passport.issuedAt)}</dd>
 						</div>
-						<div><dt>Authority/<i>Autorité</i> (8)</dt><dd>HC IDV</dd></div>
+						<div><dt>Authority/<i>Autorité</i> (8)</dt><dd>IDV</dd></div>
 					</div>
 				</dl>
 
